@@ -2,53 +2,43 @@
 #![cfg_attr(test, feature(test))]
 extern crate itertools;
 extern crate rand;
+extern crate typed_arena;
 
 use itertools::partition;
+use typed_arena::Arena;
 
-#[derive(Debug, Clone)]
-pub struct LazySort<T> {
-    greater: Vec<T>,
-    less: Option<Box<LazySort<T>>>,
-}
-
-impl<T: Ord> LazySort<T> {
-    fn split_greater(&mut self) -> Option<T> {
-        match self.greater.len() {
-            0 => None,
-            1 => self.greater.pop(),
-            _ => {
-                let split_idx = {
-                    let (pivot, rest) = self.greater.split_last_mut().unwrap();
-                    partition(rest, |el| el > pivot)
-                };
-                let pivot_idx = self.greater.len() - 1;
-                self.greater.swap(pivot_idx, split_idx);
-                let split_off_idx = split_idx + 1;
-                if split_off_idx < self.greater.len() {
-                    let mut less = Box::new(LazySort {
-                        greater: self.greater.split_off(split_off_idx),
-                        less: None,
-                    });
-                    let next = less.next();
-                    self.less = Some(less);
-                    next
-                } else {
-                    self.greater.pop()
-                }
-            }
-        }
-    }
+pub struct LazySort<T: 'static> {
+    arena: Arena<Node<T>>,
+    root: Node<T>,
 }
 
 impl<T: Ord> Iterator for LazySort<T> {
     type Item = T;
-
+    
     #[inline]
     fn next(&mut self) -> Option<T> {
+        self.root.next(&self.arena)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.root.size_hint()
+    }
+}
+
+#[derive(Debug)]
+struct Node<T: 'static> {
+    greater: Vec<T>,
+    less: Option<&'static mut Node<T>>,
+}
+
+impl<T: Ord> Node<T> {
+    #[inline]
+    fn next(&mut self, arena: &Arena<Self>) -> Option<T> {
         let next = if let Some(ref mut less) = self.less {
-            less.next()
+            less.next(arena)
         } else {
-            return self.split_greater();
+            return self.split_greater(arena);
         };
         if next.is_some() {
             next
@@ -70,15 +60,45 @@ impl<T: Ord> Iterator for LazySort<T> {
         }
     }
 
+    fn split_greater(&mut self, arena: &Arena<Self>) -> Option<T> {
+        match self.greater.len() {
+            0 => None,
+            1 => self.greater.pop(),
+            _ => {
+                let split_idx = {
+                    let (pivot, rest) = self.greater.split_last_mut().unwrap();
+                    partition(rest, |el| el > pivot)
+                };
+                let pivot_idx = self.greater.len() - 1;
+                self.greater.swap(pivot_idx, split_idx);
+                let split_off_idx = split_idx + 1;
+                if split_off_idx < self.greater.len() {
+                    let mut less = arena.alloc(Node {
+                        greater: self.greater.split_off(split_off_idx),
+                        less: None,
+                    });
+                    let next = less.next(arena);
+                    self.less = Some(unsafe { std::mem::transmute(less) });
+                    next
+                } else {
+                    self.greater.pop()
+                }
+            }
+        }
+    }
 }
 
 pub trait LazySortIterator: Iterator
     where Self: Sized
 {
     fn lazy_sort(self) -> LazySort<Self::Item> {
+        let (lower, upper) = self.size_hint();
         LazySort {
-            greater: self.collect(),
-            less: None,
+            arena: Arena::with_capacity(upper.unwrap_or(lower)),
+            root: Node {
+                greater: self.collect(),
+                less: None,
+            },
         }
     }
 }

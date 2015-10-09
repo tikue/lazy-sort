@@ -9,3 +9,4 @@ license = "MIT"
 [dependencies]
 itertools = "*"
 rand = "*"
+typed-arena = "*"
