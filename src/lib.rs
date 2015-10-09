@@ -1,4 +1,5 @@
-#![feature(slice_splits, test)]
+#![feature(slice_splits)]
+#![cfg_attr(test, feature(test))]
 extern crate itertools;
 extern crate rand;
 
