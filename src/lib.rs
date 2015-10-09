@@ -6,7 +6,7 @@ extern crate rand;
 use itertools::partition;
 
 #[derive(Debug, Clone)]
-struct LazySort<T> {
+pub struct LazySort<T> {
     greater: Vec<T>,
     less: Option<Box<LazySort<T>>>,
 }
@@ -70,7 +70,7 @@ impl<T: Ord> Iterator for LazySort<T> {
 
 }
 
-trait LazySortIterator: Iterator
+pub trait LazySortIterator: Iterator
     where Self: Sized
 {
     fn lazy_sort(self) -> LazySort<Self::Item> {
