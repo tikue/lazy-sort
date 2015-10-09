@@ -127,20 +127,56 @@ mod bench {
     use super::LazySortIterator;
 
     #[bench]
-    fn bench_lazy(b: &mut Bencher) {
+    fn take_1000_lazy(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
         b.iter(|| v.iter().cloned().lazy_sort().take(1000).collect::<Vec<_>>());
     }
 
     #[bench]
-    fn bench_eager(b: &mut Bencher) {
+    fn take_1000_eager(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
         b.iter(|| {
             let mut v = v.clone();
             v.sort();
             v.iter().cloned().take(1000).collect::<Vec<_>>();
+        });
+    }
+
+    #[bench]
+    fn take_10_000_lazy(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().lazy_sort().take(10_000).collect::<Vec<_>>());
+    }
+
+    #[bench]
+    fn take_10_000_eager(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| {
+            let mut v = v.clone();
+            v.sort();
+            v.iter().cloned().take(10_000).collect::<Vec<_>>();
+        });
+    }
+
+    #[bench]
+    fn take_50_000_lazy(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().lazy_sort().take(50_000).collect::<Vec<_>>());
+    }
+
+    #[bench]
+    fn take_50_000_eager(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| {
+            let mut v = v.clone();
+            v.sort();
+            v.iter().cloned().take(50_000).collect::<Vec<_>>();
         });
     }
 }
