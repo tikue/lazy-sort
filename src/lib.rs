@@ -23,17 +23,19 @@ impl<T: Ord> LazySort<T> {
                 };
                 let pivot_idx = self.greater.len() - 1;
                 self.greater.swap(pivot_idx, split_idx);
-                let mut less = Box::new(LazySort {
-                    greater: self.greater.split_off(split_idx + 1),
-                    less: None,
-                });
-                if let next @ Some(_) = less.next() {
+                let split_off_idx = split_idx + 1;
+                if split_off_idx < self.greater.len() {
+                    let mut less = Box::new(LazySort {
+                        greater: self.greater.split_off(split_off_idx),
+                        less: None,
+                    });
+                    let next = less.next();
                     self.less = Some(less);
                     next
                 } else {
                     self.greater.pop()
                 }
-            } 
+            }
         }
     }
 }
