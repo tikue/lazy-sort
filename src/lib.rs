@@ -12,6 +12,7 @@ pub struct LazySort<T> {
 }
 
 impl<T: Ord> LazySort<T> {
+    #[inline]
     fn split_greater(&mut self) -> Option<T> {
         match self.greater.len() {
             0 => None,
