@@ -1,5 +1,7 @@
-#![feature(slice_splits)]
+#![feature(slice_splits, test)]
 extern crate itertools;
+extern crate rand;
+
 use itertools::partition;
 
 #[derive(Debug, Clone)]
@@ -104,5 +106,32 @@ fn test_size_hint() {
         assert_eq!(v.len() - i, lower);
         assert_eq!(Some(v.len() - i), upper);
         sort_iter.next();
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    extern crate test;
+
+    use self::test::Bencher;
+    use rand::{thread_rng, Rng};
+    use super::LazySortIterator;
+
+    #[bench]
+    fn bench_lazy(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().lazy_sort().take(1000).collect::<Vec<_>>());
+    }
+
+    #[bench]
+    fn bench_eager(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| {
+            let mut v = v.clone();
+            v.sort();
+            v.iter().cloned().take(1000).collect::<Vec<_>>();
+        });
     }
 }
