@@ -22,9 +22,9 @@ impl<T: Ord> LazySort<T> {
                 self.greater.swap(pivot_idx, split_idx);
                 let mut less = Box::new(LazySort {
                     greater: self.greater.split_off(split_idx + 1),
-                    less: None
+                    less: None,
                 });
-                if let next @ Some(_) = less.next() { 
+                if let next @ Some(_) = less.next() {
                     self.less = Some(less);
                     next
                 } else {
@@ -59,14 +59,15 @@ impl<T: Ord> Iterator for LazySort<T> {
             None => (self.greater.len(), Some(self.greater.len())),
             Some(ref less) => {
                 let (lower, upper) = less.size_hint();
-                (lower + self.greater.len(), upper.map(|upper| upper + self.greater.len()))
+                (lower + self.greater.len(),
+                 upper.map(|upper| upper + self.greater.len()))
             }
         }
     }
 
 }
 
-trait LazySortIterator: Iterator 
+trait LazySortIterator: Iterator
     where Self: Sized
 {
     fn lazy_sort(self) -> LazySort<Self::Item> {
