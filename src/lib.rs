@@ -18,11 +18,16 @@ impl<T: Ord> LazySort<T> {
             0 => None,
             1 => self.greater.pop(),
             _ => {
+                let pivot_idx = self.greater.len() - 1;
                 let split_idx = {
+                    let mid_idx = self.greater.len() / 2;
+                    // We swap the middle value with the last value because partitioning is easier
+                    // if the pivot is located in the last index, making contiguous the space to 
+                    // partition
+                    self.greater.swap(pivot_idx, mid_idx);
                     let (pivot, rest) = self.greater.split_last_mut().unwrap();
                     partition(rest, |el| el > pivot)
                 };
-                let pivot_idx = self.greater.len() - 1;
                 self.greater.swap(pivot_idx, split_idx);
                 let split_off_idx = split_idx + 1;
                 if split_off_idx < self.greater.len() {
