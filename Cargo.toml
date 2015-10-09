@@ -1,0 +1,10 @@
+[package]
+name = "lazy-sort"
+version = "0.1.0"
+authors = ["Tim Kuehn <timothy.j.kuehn@gmail.com>"]
+repository = "https://github.com/tikue/lazy-sort"
+keywords = ["iterators", "sort", "lazy"]
+license = "MIT"
+
+[dependencies]
+itertools = "*"
