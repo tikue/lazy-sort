@@ -12,7 +12,6 @@ pub struct LazySort<T> {
 }
 
 impl<T: Ord> LazySort<T> {
-    #[inline]
     fn split_greater(&mut self) -> Option<T> {
         match self.greater.len() {
             0 => None,
@@ -49,7 +48,6 @@ impl<T: Ord> LazySort<T> {
 impl<T: Ord> Iterator for LazySort<T> {
     type Item = T;
 
-    #[inline]
     fn next(&mut self) -> Option<T> {
         let next = if let Some(ref mut less) = self.less {
             less.next()
