@@ -20,13 +20,17 @@ impl<T: Ord> LazySort<T> {
                 let pivot_idx = self.greater.len() - 1;
                 let split_idx = {
                     let mid_idx = self.greater.len() / 2;
-                    // We swap the middle value with the last value because partitioning is easier
-                    // if the pivot is located in the last index, making contiguous the space to 
-                    // partition
+                    // I've chosen the element in the middle of the vec as the pivot. 
+                    // However, we first swap the pivot with the last element so that there is
+                    // a contiguous space in memory to be partitioned.
                     self.greater.swap(pivot_idx, mid_idx);
                     let (pivot, rest) = self.greater.split_last_mut().unwrap();
+                    // partition all but the last element, which is the pivot. This makes the vec
+                    // look like [greater, greater, ..., greater, less, less, ..., less, pivot]
                     partition(rest, |el| el > pivot)
                 };
+                // Swapping the pivot with the first less element allows us to split off
+                // vec[split_idx + 1..] to create a new vec with all the elements less than pivot.
                 self.greater.swap(pivot_idx, split_idx);
                 let split_off_idx = split_idx + 1;
                 if split_off_idx < self.greater.len() {
@@ -34,10 +38,13 @@ impl<T: Ord> LazySort<T> {
                         greater: self.greater.split_off(split_off_idx),
                         less: None,
                     });
+                    // Recursively compute the next element from the LazySort struct containing
+                    // the elements less than the pivot.
                     let next = less.next();
                     self.less = Some(less);
                     next
                 } else {
+                    // If there were no elements less than the pivot, then return the pivot.
                     self.greater.pop()
                 }
             }
@@ -58,6 +65,8 @@ impl<T: Ord> Iterator for LazySort<T> {
             next
         } else {
             self.less = None;
+            // The pivot is always the last element in the vec, and it's the first element
+            // to be returned once all of the elements less than it have been returned.
             self.greater.pop()
         }
     }
