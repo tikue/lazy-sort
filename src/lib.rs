@@ -20,7 +20,7 @@ impl<T: Ord> LazySort<T> {
                 let pivot_idx = self.greater.len() - 1;
                 let split_idx = {
                     let mid_idx = self.greater.len() / 2;
-                    // I've chosen the element in the middle of the vec as the pivot. 
+                    // I've chosen the element in the middle of the vec as the pivot.
                     // However, we first swap the pivot with the last element so that there is
                     // a contiguous space in memory to be partitioned.
                     self.greater.swap(pivot_idx, mid_idx);
@@ -82,7 +82,6 @@ impl<T: Ord> Iterator for LazySort<T> {
             }
         }
     }
-
 }
 
 pub trait LazySortIterator: Iterator
