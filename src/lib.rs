@@ -1,17 +1,78 @@
-#![feature(slice_splits)]
+#![feature(slice_splits, core)]
 #![cfg_attr(test, feature(test))]
+extern crate core;
 extern crate itertools;
 extern crate rand;
 
+use core::ptr;
 use itertools::partition;
+use std::cmp::Ordering::{self, Less};
+use std::mem;
 
 #[derive(Debug, Clone)]
 pub struct LazySort<T> {
-    greater: Vec<T>,
-    less: Option<Box<LazySort<T>>>,
+    inner: LazySortInternal<T>
 }
 
-impl<T: Ord> LazySort<T> {
+impl<T: Ord> Iterator for LazySort<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.inner.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+#[derive(Debug, Clone)]
+enum LazySortInternal<T> {
+    Base(Vec<T>),
+    Recursive(Recursive<T>),
+}
+
+impl<T: Ord> LazySortInternal<T> {
+    fn new(mut v: Vec<T>) -> LazySortInternal<T> {
+        if v.len() <= 32 {
+            insertion_sort(&mut v, |a, b| b.cmp(a));
+            LazySortInternal::Base(v)
+        } else {
+            LazySortInternal::Recursive(Recursive::new(v))
+        }
+    }
+}
+
+impl<T: Ord> Iterator for LazySortInternal<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        match *self {
+            LazySortInternal::Base(ref mut v) => v.pop(),
+            LazySortInternal::Recursive(ref mut r) => r.next()
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match *self {
+            LazySortInternal::Base(ref v) => (v.len(), Some(v.len())),
+            LazySortInternal::Recursive(ref r) => r.size_hint()
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Recursive<T> {
+    greater: Vec<T>,
+    less: Option<Box<LazySortInternal<T>>>,
+}
+
+impl<T: Ord> Recursive<T> {
+    fn new(v: Vec<T>) -> Recursive<T> {
+        Recursive { greater: v, less: None }
+    }
+
     fn split_greater(&mut self) -> Option<T> {
         match self.greater.len() {
             0 => None,
@@ -34,11 +95,8 @@ impl<T: Ord> LazySort<T> {
                 self.greater.swap(pivot_idx, split_idx);
                 let split_off_idx = split_idx + 1;
                 if split_off_idx < self.greater.len() {
-                    let mut less = Box::new(LazySort {
-                        greater: self.greater.split_off(split_off_idx),
-                        less: None,
-                    });
-                    // Recursively compute the next element from the LazySort struct containing
+                    let mut less = Box::new(LazySortInternal::new(self.greater.split_off(split_off_idx)));
+                    // Recursively compute the next element from the LazySortInternal struct containing
                     // the elements less than the pivot.
                     let next = less.next();
                     self.less = Some(less);
@@ -52,7 +110,7 @@ impl<T: Ord> LazySort<T> {
     }
 }
 
-impl<T: Ord> Iterator for LazySort<T> {
+impl<T: Ord> Iterator for Recursive<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
@@ -85,17 +143,17 @@ impl<T: Ord> Iterator for LazySort<T> {
 }
 
 pub trait LazySortIterator: Iterator
-    where Self: Sized
+    where Self: Sized,
+          Self::Item: Ord
 {
     fn lazy_sort(self) -> LazySort<Self::Item> {
-        LazySort {
-            greater: self.collect(),
-            less: None,
-        }
+        LazySort { inner: LazySortInternal::new(self.collect()) }
     }
 }
 
-impl<T> LazySortIterator for T where T: Iterator { }
+impl<T> LazySortIterator for T 
+    where T: Iterator,
+          T::Item: Ord { }
 
 #[test]
 fn test_sort() {
@@ -121,6 +179,47 @@ fn test_size_hint() {
         assert_eq!(v.len() - i, lower);
         assert_eq!(Some(v.len() - i), upper);
         sort_iter.next();
+    }
+}
+
+// This is copied from libcollections/slice.rs
+fn insertion_sort<T, F>(v: &mut [T], mut compare: F) where F: FnMut(&T, &T) -> Ordering {
+    let len = v.len() as isize;
+    let buf_v = v.as_mut_ptr();
+
+    // 1 <= i < len;
+    for i in 1..len {
+        // j satisfies: 0 <= j <= i;
+        let mut j = i;
+        unsafe {
+            // `i` is in bounds.
+            let read_ptr = buf_v.offset(i) as *const T;
+
+            // find where to insert, we need to do strict <,
+            // rather than <=, to maintain stability.
+
+            // 0 <= j - 1 < len, so .offset(j - 1) is in bounds.
+            while j > 0 &&
+                    compare(&*read_ptr, &*buf_v.offset(j - 1)) == Less {
+                j -= 1;
+            }
+
+            // shift everything to the right, to make space to
+            // insert this value.
+
+            // j + 1 could be `len` (for the last `i`), but in
+            // that case, `i == j` so we don't copy. The
+            // `.offset(j)` is always in bounds.
+
+            if i != j {
+                let tmp = ptr::read(read_ptr);
+                ptr::copy(&*buf_v.offset(j),
+                          buf_v.offset(j + 1),
+                          (i - j) as usize);
+                ptr::copy_nonoverlapping(&tmp, buf_v.offset(j), 1);
+                mem::forget(tmp);
+            }
+        }
     }
 }
 
