@@ -159,33 +159,6 @@ impl<T> LazySortIterator for T
     where T: Iterator,
           T::Item: Ord { }
 
-#[test]
-fn test_sort() {
-    let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
-    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
-    v.sort();
-    assert_eq!(v, v2);
-}
-
-#[test]
-fn test_empty() {
-    let v: Vec<u64> = vec![];
-    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
-    assert_eq!(v, v2);
-}
-
-#[test]
-fn test_size_hint() {
-    let v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
-    let mut sort_iter = v.iter().cloned().lazy_sort();
-    for i in 0..v.len() {
-        let (lower, upper) = sort_iter.size_hint();
-        assert_eq!(v.len() - i, lower);
-        assert_eq!(Some(v.len() - i), upper);
-        sort_iter.next();
-    }
-}
-
 // This is copied from libcollections/slice.rs
 fn insertion_sort<T, F>(v: &mut [T], mut compare: F)
     where F: FnMut(&T, &T) -> Ordering
@@ -223,6 +196,33 @@ fn insertion_sort<T, F>(v: &mut [T], mut compare: F)
                 mem::forget(tmp);
             }
         }
+    }
+}
+
+#[test]
+fn test_sort() {
+    let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
+    v.sort();
+    assert_eq!(v, v2);
+}
+
+#[test]
+fn test_empty() {
+    let v: Vec<u64> = vec![];
+    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
+    assert_eq!(v, v2);
+}
+
+#[test]
+fn test_size_hint() {
+    let v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let mut sort_iter = v.iter().cloned().lazy_sort();
+    for i in 0..v.len() {
+        let (lower, upper) = sort_iter.size_hint();
+        assert_eq!(v.len() - i, lower);
+        assert_eq!(Some(v.len() - i), upper);
+        sort_iter.next();
     }
 }
 
