@@ -11,7 +11,7 @@ use std::mem;
 
 #[derive(Debug, Clone)]
 pub struct LazySort<T> {
-    inner: LazySortInternal<T>
+    inner: LazySortInternal<T>,
 }
 
 impl<T: Ord> Iterator for LazySort<T> {
@@ -49,7 +49,7 @@ impl<T: Ord> Iterator for LazySortInternal<T> {
     fn next(&mut self) -> Option<T> {
         match *self {
             LazySortInternal::Base(ref mut v) => v.pop(),
-            LazySortInternal::Recursive(ref mut r) => r.next()
+            LazySortInternal::Recursive(ref mut r) => r.next(),
         }
     }
 
@@ -57,7 +57,7 @@ impl<T: Ord> Iterator for LazySortInternal<T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         match *self {
             LazySortInternal::Base(ref v) => (v.len(), Some(v.len())),
-            LazySortInternal::Recursive(ref r) => r.size_hint()
+            LazySortInternal::Recursive(ref r) => r.size_hint(),
         }
     }
 }
@@ -70,7 +70,10 @@ struct Recursive<T> {
 
 impl<T: Ord> Recursive<T> {
     fn new(v: Vec<T>) -> Recursive<T> {
-        Recursive { greater: v, less: None }
+        Recursive {
+            greater: v,
+            less: None,
+        }
     }
 
     fn split_greater(&mut self) -> Option<T> {
@@ -95,7 +98,8 @@ impl<T: Ord> Recursive<T> {
                 self.greater.swap(pivot_idx, split_idx);
                 let split_off_idx = split_idx + 1;
                 if split_off_idx < self.greater.len() {
-                    let mut less = Box::new(LazySortInternal::new(self.greater.split_off(split_off_idx)));
+                    let mut less = Box::new(LazySortInternal::new(self.greater
+                                                                      .split_off(split_off_idx)));
                     // Recursively compute the next element from the LazySortInternal struct containing
                     // the elements less than the pivot.
                     let next = less.next();
@@ -151,7 +155,7 @@ pub trait LazySortIterator: Iterator
     }
 }
 
-impl<T> LazySortIterator for T 
+impl<T> LazySortIterator for T
     where T: Iterator,
           T::Item: Ord { }
 
@@ -183,7 +187,9 @@ fn test_size_hint() {
 }
 
 // This is copied from libcollections/slice.rs
-fn insertion_sort<T, F>(v: &mut [T], mut compare: F) where F: FnMut(&T, &T) -> Ordering {
+fn insertion_sort<T, F>(v: &mut [T], mut compare: F)
+    where F: FnMut(&T, &T) -> Ordering
+{
     let len = v.len() as isize;
     let buf_v = v.as_mut_ptr();
 
@@ -199,8 +205,7 @@ fn insertion_sort<T, F>(v: &mut [T], mut compare: F) where F: FnMut(&T, &T) -> O
             // rather than <=, to maintain stability.
 
             // 0 <= j - 1 < len, so .offset(j - 1) is in bounds.
-            while j > 0 &&
-                    compare(&*read_ptr, &*buf_v.offset(j - 1)) == Less {
+            while j > 0 && compare(&*read_ptr, &*buf_v.offset(j - 1)) == Less {
                 j -= 1;
             }
 
@@ -213,9 +218,7 @@ fn insertion_sort<T, F>(v: &mut [T], mut compare: F) where F: FnMut(&T, &T) -> O
 
             if i != j {
                 let tmp = ptr::read(read_ptr);
-                ptr::copy(&*buf_v.offset(j),
-                          buf_v.offset(j + 1),
-                          (i - j) as usize);
+                ptr::copy(&*buf_v.offset(j), buf_v.offset(j + 1), (i - j) as usize);
                 ptr::copy_nonoverlapping(&tmp, buf_v.offset(j), 1);
                 mem::forget(tmp);
             }
