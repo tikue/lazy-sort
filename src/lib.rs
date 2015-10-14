@@ -100,8 +100,8 @@ impl<T: Ord> Recursive<T> {
                 if split_off_idx < self.greater.len() {
                     let mut less = Box::new(LazySortInternal::new(self.greater
                                                                       .split_off(split_off_idx)));
-                    // Recursively compute the next element from the LazySortInternal struct containing
-                    // the elements less than the pivot.
+                    // Recursively compute the next element from the LazySortInternal struct
+                    // containing the elements less than the pivot.
                     let next = less.next();
                     self.less = Some(less);
                     next
