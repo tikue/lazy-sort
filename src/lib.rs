@@ -5,10 +5,9 @@
 //! | ------------- | ------------- |
 //! | O(n + klog(n) | O(n + klog(k) |
 //! 
-//! However, quicksort allocates, whereas heapsort does not,
-//! so for values of k that are a significant fraction of n,
-//! heapsort may perform better than both quicksort and
-//! regular sorting.
+//! However, quicksort allocates to track its recursive state, whereas heapsort allocates entirely
+//! up front, so for values of k that are a significant fraction of n, heapsort will perform 
+//! better.
 
 #![deny(missing_docs)]
 #![feature(slice_splits, core)]
