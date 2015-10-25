@@ -1,3 +1,16 @@
+//! Provides two lazy sort variants that can be faster than a full sort in certain situations.
+//! Complexity of taking the first k elements:
+//!
+//! | HeapSort      | QuickSort     |
+//! | ------------- | ------------- |
+//! | O(n + klog(n) | O(n + klog(k) |
+//! 
+//! However, quicksort allocates, whereas heapsort does not,
+//! so for values of k that are a significant fraction of n,
+//! heapsort may perform better than both quicksort and
+//! regular sorting.
+
+#![deny(missing_docs)]
 #![feature(slice_splits, core)]
 #![cfg_attr(test, feature(test))]
 extern crate core;
@@ -9,12 +22,33 @@ use itertools::partition;
 use std::cmp::Ordering::{self, Less};
 use std::mem;
 
-#[derive(Debug, Clone)]
-pub struct LazySort<T> {
-    inner: LazySortInternal<T>,
+/// An iterator extension trait that provides two methods for lazily sorting.
+pub trait LazySortIterator: Iterator
+    where Self: Sized,
+          Self::Item: Ord
+{
+    /// Lazily sort using quicksort.
+    fn quick_sort(self) -> QuickSort<Self::Item> {
+        QuickSort { inner: QuickSortInternal::new(self.collect()) }
+    }
+
+    /// Lazily sort using heapsort.
+    fn heap_sort(self) -> HeapSort<Self::Item> {
+        HeapSort(self.map(|el| ReverseOrder(el)).collect())
+    }
 }
 
-impl<T: Ord> Iterator for LazySort<T> {
+impl<T> LazySortIterator for T
+    where T: Iterator,
+          T::Item: Ord { }
+
+/// An iterator that lazily sorts its input using quicksort.
+#[derive(Debug, Clone)]
+pub struct QuickSort<T> {
+    inner: QuickSortInternal<T>,
+}
+
+impl<T: Ord> Iterator for QuickSort<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
@@ -27,37 +61,37 @@ impl<T: Ord> Iterator for LazySort<T> {
 }
 
 #[derive(Debug, Clone)]
-enum LazySortInternal<T> {
+enum QuickSortInternal<T> {
     Base(Vec<T>),
     Recursive(Recursive<T>),
 }
 
-impl<T: Ord> LazySortInternal<T> {
-    fn new(mut v: Vec<T>) -> LazySortInternal<T> {
+impl<T: Ord> QuickSortInternal<T> {
+    fn new(mut v: Vec<T>) -> QuickSortInternal<T> {
         if v.len() <= 32 {
             insertion_sort(&mut v, |a, b| b.cmp(a));
-            LazySortInternal::Base(v)
+            QuickSortInternal::Base(v)
         } else {
-            LazySortInternal::Recursive(Recursive::new(v))
+            QuickSortInternal::Recursive(Recursive::new(v))
         }
     }
 }
 
-impl<T: Ord> Iterator for LazySortInternal<T> {
+impl<T: Ord> Iterator for QuickSortInternal<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
         match *self {
-            LazySortInternal::Base(ref mut v) => v.pop(),
-            LazySortInternal::Recursive(ref mut r) => r.next(),
+            QuickSortInternal::Base(ref mut v) => v.pop(),
+            QuickSortInternal::Recursive(ref mut r) => r.next(),
         }
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match *self {
-            LazySortInternal::Base(ref v) => (v.len(), Some(v.len())),
-            LazySortInternal::Recursive(ref r) => r.size_hint(),
+            QuickSortInternal::Base(ref v) => (v.len(), Some(v.len())),
+            QuickSortInternal::Recursive(ref r) => r.size_hint(),
         }
     }
 }
@@ -65,7 +99,7 @@ impl<T: Ord> Iterator for LazySortInternal<T> {
 #[derive(Clone, Debug)]
 struct Recursive<T> {
     greater: Vec<T>,
-    less: Option<Box<LazySortInternal<T>>>,
+    less: Option<Box<QuickSortInternal<T>>>,
 }
 
 impl<T: Ord> Recursive<T> {
@@ -98,9 +132,9 @@ impl<T: Ord> Recursive<T> {
                 self.greater.swap(pivot_idx, split_idx);
                 let split_off_idx = split_idx + 1;
                 if split_off_idx < self.greater.len() {
-                    let mut less = Box::new(LazySortInternal::new(self.greater
+                    let mut less = Box::new(QuickSortInternal::new(self.greater
                                                                       .split_off(split_off_idx)));
-                    // Recursively compute the next element from the LazySortInternal struct containing
+                    // Recursively compute the next element from the QuickSortInternal struct containing
                     // the elements less than the pivot.
                     let next = less.next();
                     self.less = Some(less);
@@ -146,23 +180,10 @@ impl<T: Ord> Iterator for Recursive<T> {
     }
 }
 
-pub trait LazySortIterator: Iterator
-    where Self: Sized,
-          Self::Item: Ord
-{
-    fn lazy_sort(self) -> LazySort<Self::Item> {
-        LazySort { inner: LazySortInternal::new(self.collect()) }
-    }
-}
-
-impl<T> LazySortIterator for T
-    where T: Iterator,
-          T::Item: Ord { }
-
 #[test]
 fn test_sort() {
     let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
-    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
+    let v2: Vec<_> = v.iter().cloned().quick_sort().collect();
     v.sort();
     assert_eq!(v, v2);
 }
@@ -170,14 +191,14 @@ fn test_sort() {
 #[test]
 fn test_empty() {
     let v: Vec<u64> = vec![];
-    let v2: Vec<_> = v.iter().cloned().lazy_sort().collect();
+    let v2: Vec<_> = v.iter().cloned().quick_sort().collect();
     assert_eq!(v, v2);
 }
 
 #[test]
 fn test_size_hint() {
     let v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
-    let mut sort_iter = v.iter().cloned().lazy_sort();
+    let mut sort_iter = v.iter().cloned().quick_sort();
     for i in 0..v.len() {
         let (lower, upper) = sort_iter.size_hint();
         assert_eq!(v.len() - i, lower);
@@ -226,6 +247,66 @@ fn insertion_sort<T, F>(v: &mut [T], mut compare: F)
     }
 }
 
+use std::collections::BinaryHeap;
+/// An iterator that lazily sorts its input using quicksort.
+pub struct HeapSort<T>(BinaryHeap<ReverseOrder<T>>);
+
+#[derive(Eq, PartialEq)]
+struct ReverseOrder<T>(T);
+
+impl <T: PartialOrd> PartialOrd for ReverseOrder<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.0.partial_cmp(&self.0)
+    }
+}
+
+impl <T: Ord> Ord for ReverseOrder<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.0.cmp(&self.0)
+    }
+}
+
+impl<T: Ord> Iterator for HeapSort<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.0.pop().map(|ReverseOrder(el)| el)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.0.len();
+        (len, Some(len))
+    }
+}
+
+
+#[test]
+fn heap_sort() {
+    let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let v2: Vec<_> = v.iter().cloned().heap_sort().collect();
+    v.sort();
+    assert_eq!(v, v2);
+}
+
+#[test]
+fn heap_empty() {
+    let v: Vec<u64> = vec![];
+    let v2: Vec<_> = v.iter().cloned().heap_sort().collect();
+    assert_eq!(v, v2);
+}
+
+#[test]
+fn heap_size_hint() {
+    let v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let mut sort_iter = v.iter().cloned().heap_sort();
+    for i in 0..v.len() {
+        let (lower, upper) = sort_iter.size_hint();
+        assert_eq!(v.len() - i, lower);
+        assert_eq!(Some(v.len() - i), upper);
+        sort_iter.next();
+    }
+}
+
 #[cfg(test)]
 mod bench {
     extern crate test;
@@ -238,7 +319,14 @@ mod bench {
     fn take_1000_lazy(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().lazy_sort().take(1000).collect::<Vec<_>>());
+        b.iter(|| v.iter().cloned().quick_sort().take(1000).collect::<Vec<_>>());
+    }
+
+    #[bench]
+    fn take_1000_heap(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().heap_sort().take(1000).collect::<Vec<_>>());
     }
 
     #[bench]
@@ -256,7 +344,14 @@ mod bench {
     fn take_10_000_lazy(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().lazy_sort().take(10_000).collect::<Vec<_>>());
+        b.iter(|| v.iter().cloned().quick_sort().take(10_000).collect::<Vec<_>>());
+    }
+
+    #[bench]
+    fn take_10_000_heap(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().heap_sort().take(10_000).collect::<Vec<_>>());
     }
 
     #[bench]
@@ -274,17 +369,13 @@ mod bench {
     fn take_50_000_lazy(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().lazy_sort().take(50_000).collect::<Vec<_>>());
+        b.iter(|| v.iter().cloned().quick_sort().take(50_000).collect::<Vec<_>>());
     }
 
     #[bench]
-    fn take_50_000_eager(b: &mut Bencher) {
+    fn take_50_000_heap(b: &mut Bencher) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| {
-            let mut v = v.clone();
-            v.sort();
-            v.iter().cloned().take(50_000).collect::<Vec<_>>();
-        });
+        b.iter(|| v.iter().cloned().heap_sort().take(50_000).collect::<Vec<_>>());
     }
 }
