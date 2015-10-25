@@ -134,8 +134,8 @@ impl<T: Ord> Recursive<T> {
                 if split_off_idx < self.greater.len() {
                     let mut less = Box::new(QuickSortInternal::new(self.greater
                                                                       .split_off(split_off_idx)));
-                    // Recursively compute the next element from the QuickSortInternal struct containing
-                    // the elements less than the pivot.
+                    // Recursively compute the next element from the QuickSortInternal struct
+                    // containing the elements less than the pivot.
                     let next = less.next();
                     self.less = Some(less);
                     next
@@ -281,6 +281,14 @@ impl<T: Ord> Iterator for HeapSort<T> {
 
 
 #[test]
+fn quick_sort() {
+    let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let v2: Vec<_> = v.iter().cloned().quick_sort().collect();
+    v.sort();
+    assert_eq!(v, v2);
+}
+
+#[test]
 fn heap_sort() {
     let mut v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
     let v2: Vec<_> = v.iter().cloned().heap_sort().collect();
@@ -289,10 +297,29 @@ fn heap_sort() {
 }
 
 #[test]
+fn quick_empty() {
+    let v: Vec<u64> = vec![];
+    let v2: Vec<_> = v.iter().cloned().quick_sort().collect();
+    assert_eq!(v, v2);
+}
+
+#[test]
 fn heap_empty() {
     let v: Vec<u64> = vec![];
     let v2: Vec<_> = v.iter().cloned().heap_sort().collect();
     assert_eq!(v, v2);
+}
+
+#[test]
+fn quick_size_hint() {
+    let v = vec![2, 4, 2, 5, 8, 4, 3, 4, 6];
+    let mut sort_iter = v.iter().cloned().quick_sort();
+    for i in 0..v.len() {
+        let (lower, upper) = sort_iter.size_hint();
+        assert_eq!(v.len() - i, lower);
+        assert_eq!(Some(v.len() - i), upper);
+        sort_iter.next();
+    }
 }
 
 #[test]
@@ -315,67 +342,85 @@ mod bench {
     use rand::{thread_rng, Rng};
     use super::LazySortIterator;
 
-    #[bench]
-    fn take_1000_lazy(b: &mut Bencher) {
+    fn take_quick(b: &mut Bencher, k: usize) {
         let mut rng = thread_rng();
         let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().quick_sort().take(1000).collect::<Vec<_>>());
+        b.iter(|| v.iter().cloned().quick_sort().take(k).collect::<Vec<_>>());
+    }
+
+    fn take_heap(b: &mut Bencher, k: usize) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| v.iter().cloned().heap_sort().take(k).collect::<Vec<_>>());
+    }
+
+    fn take_eager(b: &mut Bencher, k: usize) {
+        let mut rng = thread_rng();
+        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
+        b.iter(|| {
+            let mut v = v.clone();
+            v.sort();
+            v.iter().cloned().take(k).collect::<Vec<_>>();
+        });
+    }
+
+    #[bench]
+    fn take_10_quick(b: &mut Bencher) {
+        take_quick(b, 10);
+    }
+
+    #[bench]
+    fn take_10_heap(b: &mut Bencher) {
+        take_heap(b, 10);
+    }
+
+    #[bench]
+    fn take_10_eager(b: &mut Bencher) {
+        take_eager(b, 10);
+    }
+
+    #[bench]
+    fn take_1000_quick(b: &mut Bencher) {
+        take_quick(b, 1000)
     }
 
     #[bench]
     fn take_1000_heap(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().heap_sort().take(1000).collect::<Vec<_>>());
+        take_heap(b, 1000);
     }
 
     #[bench]
     fn take_1000_eager(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| {
-            let mut v = v.clone();
-            v.sort();
-            v.iter().cloned().take(1000).collect::<Vec<_>>();
-        });
+        take_eager(b, 1000);
     }
 
     #[bench]
-    fn take_10_000_lazy(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().quick_sort().take(10_000).collect::<Vec<_>>());
+    fn take_10_000_quick(b: &mut Bencher) {
+        take_quick(b, 10_000);
     }
 
     #[bench]
     fn take_10_000_heap(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().heap_sort().take(10_000).collect::<Vec<_>>());
+        take_heap(b, 10_000);
     }
 
     #[bench]
     fn take_10_000_eager(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| {
-            let mut v = v.clone();
-            v.sort();
-            v.iter().cloned().take(10_000).collect::<Vec<_>>();
-        });
+        take_eager(b, 10_000);
     }
 
     #[bench]
-    fn take_50_000_lazy(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().quick_sort().take(50_000).collect::<Vec<_>>());
+    fn take_50_000_quick(b: &mut Bencher) {
+        take_quick(b, 50_000);
     }
 
     #[bench]
     fn take_50_000_heap(b: &mut Bencher) {
-        let mut rng = thread_rng();
-        let v: Vec<u32> = rng.gen_iter().take(50_000).collect();
-        b.iter(|| v.iter().cloned().heap_sort().take(50_000).collect::<Vec<_>>());
+        take_heap(b, 50_000);
+    }
+
+    #[bench]
+    fn take_50_000_eager(b: &mut Bencher) {
+        take_eager(b, 50_000);
     }
 }
